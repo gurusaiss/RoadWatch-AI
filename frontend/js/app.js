@@ -165,6 +165,7 @@ function quickFilter(country, condition) {
 
 /* ═══════════════ ROAD GRID ════════════════════════════════════════════ */
 async function loadRoads() {
+  if (_nearMeActive) return;   // ← Near Me is showing — don't overwrite it
   const country = $('filterCountry').value;
   const type    = $('filterType').value;
   const cond    = $('filterCond').value;
@@ -438,23 +439,34 @@ function clearNearMe(skipReload = false) {
 }
 
 function renderNearbyRoads(roads) {
-  const grid = $('roadGrid');   // correct element ID
+  const grid = $('roadGrid');
   if (!grid) return;
+
+  // Update results count bar
+  const cb = $('resultsCountBar');
+  if (cb) cb.innerHTML = `<span>📍 Showing <strong>${roads.length}</strong> road${roads.length !== 1 ? 's' : ''} near your location <span class="rc-chip">Within 200 km</span></span>`;
+
+  if (roads.length === 0) {
+    grid.innerHTML = `<div class="empty-state"><div class="es-icon">📍</div><h3>No roads found nearby</h3><p>No monitored roads within 200 km of your location.</p><button class="btn-next" onclick="clearNearMe()">Show All Roads</button></div>`;
+    return;
+  }
+
   grid.innerHTML = roads.map(r => {
-    const dist  = r.distance_km !== undefined
-      ? `<div class="road-dist-badge">📍 ${r.distance_km} km away</div>` : '';
     const cond  = r.condition_label || 'Unknown';
     const score = r.condition_score ?? '—';
-    const san   = r.budget_sanctioned;
-    const sp    = r.budget_spent;
+    const san   = r.budget_sanctioned || 0;
+    const sp    = r.budget_spent || 0;
     const anomaly = san > 0 && sp > 0 && (sp / san) < 0.65;
+    const distKm  = r.distance_km !== undefined ? r.distance_km : null;
     return `
       <div class="road-card ${condClass(cond)} near-me-card" onclick="openRoadModal('${r.road_id}')" tabindex="0"
            role="button" aria-label="${r.road_name}">
-        ${dist}
         <div class="road-card-header">
           <div>
-            <div class="road-id">${r.road_id}</div>
+            <div class="road-id-row">
+              <span class="road-id">${r.road_id}</span>
+              ${distKm !== null ? `<span class="road-dist-badge">📍 ${distKm} km away</span>` : ''}
+            </div>
             <div class="road-name">${r.road_name}</div>
             <div class="road-meta">${r.country}${r.state ? ' · ' + r.state : ''}</div>
           </div>

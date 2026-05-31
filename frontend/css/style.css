@@ -129,17 +129,26 @@ button{cursor:pointer;font-family:inherit}
 /* ── Near Me card highlight + distance badge ────────────────────────────── */
 .near-me-card{
   border:2px solid #f59e0b !important;
-  box-shadow:0 0 0 3px rgba(245,158,11,.18), var(--shadow) !important;
+  box-shadow:0 0 0 4px rgba(245,158,11,.22), 0 4px 20px rgba(245,158,11,.15) !important;
+  position:relative;
 }
-.road-dist-badge{
-  display:flex;align-items:center;gap:.35rem;
+.near-me-card::before{
+  content:'📍 Near You';
+  position:absolute;top:-11px;left:12px;
   background:linear-gradient(90deg,#f59e0b,#f97316);
-  color:#fff;
-  font-size:.8rem;font-weight:800;
-  padding:.32rem .85rem;
-  border-radius:7px 7px 0 0;
-  letter-spacing:.02em;
-  margin:-1px -1px 0 -1px;   /* flush to card top edge */
+  color:#fff;font-size:.72rem;font-weight:800;
+  padding:.18rem .65rem;border-radius:20px;
+  letter-spacing:.03em;white-space:nowrap;
+  box-shadow:0 2px 6px rgba(249,115,22,.4);
+}
+.road-id-row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.1rem}
+.road-dist-badge{
+  display:inline-flex;align-items:center;gap:.2rem;
+  background:linear-gradient(90deg,#f59e0b,#f97316);
+  color:#fff;font-size:.72rem;font-weight:800;
+  padding:.15rem .55rem;border-radius:20px;
+  letter-spacing:.02em;white-space:nowrap;
+  box-shadow:0 1px 4px rgba(249,115,22,.4);
 }
 
 .autocomplete-box{position:absolute;top:100%;left:0;right:0;background:#fff;
