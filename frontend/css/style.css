@@ -111,20 +111,40 @@ button{cursor:pointer;font-family:inherit}
 /* ── Near Me status bar ─────────────────────────────────────────────────── */
 .near-me-bar{
   display:flex;align-items:center;justify-content:space-between;
-  background:rgba(16,185,129,.12);
-  border:1px solid rgba(16,185,129,.35);
+  background:linear-gradient(90deg,#065f46,#047857);
+  border:none;
   border-radius:8px;
-  padding:.45rem .85rem;
+  padding:.5rem 1rem;
   margin-top:.5rem;
-  font-size:.85rem;color:#065f46;
-  font-weight:600;
+  font-size:.88rem;color:#ffffff;
+  font-weight:700;
+  letter-spacing:.01em;
+  box-shadow:0 2px 8px rgba(5,95,70,.35);
 }
 .near-me-clear{
-  background:transparent;border:1px solid rgba(16,185,129,.5);
-  color:#065f46;border-radius:6px;padding:.2rem .6rem;font-size:.78rem;
-  font-weight:600;transition:all .15s;
+  background:rgba(255,255,255,.15);
+  border:1px solid rgba(255,255,255,.4);
+  color:#fff;border-radius:6px;padding:.22rem .7rem;font-size:.78rem;
+  font-weight:700;transition:all .15s;white-space:nowrap;
 }
-.near-me-clear:hover{background:rgba(16,185,129,.15)}
+.near-me-clear:hover{background:rgba(255,255,255,.28)}
+
+/* ── Near Me filter badge ────────────────────────────────────────────────── */
+.nm-filter-badge{
+  display:flex;align-items:center;gap:.5rem;
+  background:linear-gradient(90deg,#f59e0b,#f97316);
+  color:#fff;font-size:.82rem;font-weight:800;
+  padding:.38rem .9rem;border-radius:8px;
+  white-space:nowrap;margin-bottom:.35rem;
+  box-shadow:0 2px 8px rgba(245,158,11,.35);
+  width:100%;
+}
+.nm-filter-clear{
+  background:rgba(255,255,255,.25);border:1px solid rgba(255,255,255,.5);
+  color:#fff;border-radius:5px;padding:.15rem .55rem;font-size:.76rem;font-weight:700;
+  margin-left:auto;cursor:pointer;transition:all .15s;
+}
+.nm-filter-clear:hover{background:rgba(255,255,255,.4)}
 
 /* ── Near Me card highlight + distance badge ────────────────────────────── */
 .near-me-card{

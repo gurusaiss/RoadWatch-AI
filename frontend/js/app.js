@@ -400,11 +400,17 @@ function findNearMe() {
         const bar = $('nearMeBar');
         bar.style.display = 'flex';
         $('nearMeLabel').textContent =
-          `📍 ${roads.length} road${roads.length > 1 ? 's' : ''} within 200 km of your location`;
+          `📍 ${roads.length} road${roads.length > 1 ? 's' : ''} found within 200 km of your location`;
+
+        // Lock filters to Near Me mode
+        setNearMeFilterMode(true);
+
+        // Update stats bar with nearby-road data
+        updateStatsForNearMe(roads);
 
         // Render the nearby roads in the grid
         renderNearbyRoads(roads);
-        toast(`Found ${roads.length} roads near you!`, 'success');
+        toast(`📍 Found ${roads.length} road${roads.length > 1 ? 's' : ''} near you!`, 'success');
       } catch (err) {
         toast('Could not fetch nearby roads. Try again.', 'error');
         btn.innerHTML = '<span class="near-me-icon">📍</span> Near Me';
@@ -426,7 +432,7 @@ function findNearMe() {
 }
 
 function clearNearMe(skipReload = false) {
-  if (!_nearMeActive && skipReload) return;  // nothing to clear
+  if (!_nearMeActive && skipReload) return;
   _nearMeActive = false;
   const btn = $('nearMeBtn');
   if (btn) {
@@ -435,7 +441,51 @@ function clearNearMe(skipReload = false) {
   }
   const bar = $('nearMeBar');
   if (bar) bar.style.display = 'none';
-  if (!skipReload) loadRoads(); // restore normal road list
+  setNearMeFilterMode(false);    // unlock filters
+  if (!skipReload) { loadStats(); loadRoads(); }  // restore global stats + road list
+}
+
+function setNearMeFilterMode(active) {
+  const selects = ['filterCountry','filterType','filterCond','sortBy'];
+  selects.forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    el.disabled = active;
+    el.style.opacity = active ? '0.45' : '';
+    el.style.cursor  = active ? 'not-allowed' : '';
+  });
+  // Show / hide the Near Me filter badge
+  let badge = $('nearMeFilterBadge');
+  if (active) {
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.id = 'nearMeFilterBadge';
+      badge.className = 'nm-filter-badge';
+      badge.innerHTML = '📍 Near Me Mode — filters locked &nbsp;<button onclick="clearNearMe()" class="nm-filter-clear">✕ Exit</button>';
+      const toolbar = document.querySelector('.filter-group');
+      if (toolbar) toolbar.prepend(badge);
+    }
+    badge.style.display = 'flex';
+  } else {
+    if (badge) badge.style.display = 'none';
+  }
+}
+
+function updateStatsForNearMe(roads) {
+  const poorCritical = roads.filter(r => ['Poor','Critical'].includes(r.condition_label)).length;
+  const countries    = new Set(roads.map(r => r.country).filter(Boolean)).size;
+  const anomalies    = roads.filter(r => r.budget_sanctioned > 0 && r.budget_spent > 0 &&
+                         (r.budget_spent / r.budget_sanctioned) < 0.65).length;
+  const totalKm      = roads.reduce((s, r) => s + (r.total_length_km || 0), 0);
+  const fmt = n => n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+
+  const set = (id, val) => { const el = $(id); if (el) el.textContent = val; };
+  set('stat-roads',      roads.length);
+  set('stat-critical',   poorCritical || '—');
+  set('stat-complaints', '—');           // not available per-road from nearby API
+  set('stat-countries',  countries || '—');
+  set('stat-anomalies',  anomalies || '—');
+  set('stat-km',         fmt(Math.round(totalKm)));
 }
 
 function renderNearbyRoads(roads) {
