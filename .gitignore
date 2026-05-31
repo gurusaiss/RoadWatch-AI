@@ -1,0 +1,42 @@
+# Environment — NEVER commit real keys
+backend/.env
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyc
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Database (generated at runtime)
+data/roadwatch.db
+data/uploads/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+..server.log
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Vercel
+.vercel/

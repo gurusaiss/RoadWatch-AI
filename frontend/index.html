@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RoadWatch — AI Road Infrastructure Transparency</title>
+  <meta name="description" content="AI-powered platform to monitor road quality, track public spending, and report road issues to the right authorities."/>
+  <link rel="manifest" href="/manifest.json"/>
+  <meta name="theme-color" content="#1a3c5e"/>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Marked -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+
+<!-- ═══════════════════ NAVBAR ═══════════════════════════════════════════════ -->
+<nav class="navbar" id="navbar">
+  <div class="nav-brand" onclick="showSection('dashboard')" role="button" tabindex="0" aria-label="RoadWatch Home">
+    <span class="nav-logo" aria-hidden="true">🛣️</span>
+    <span class="nav-title">Road<span class="accent">Watch</span></span>
+    <span class="nav-badge">AI</span>
+  </div>
+  <div class="nav-links" id="navLinks" role="navigation" aria-label="Main navigation">
+    <button class="nav-btn active" data-section="dashboard"         onclick="showSection('dashboard')"         aria-label="Dashboard">🏠 Dashboard</button>
+    <button class="nav-btn"        data-section="map-section"       onclick="showSection('map-section')"       aria-label="Map">🗺️ Map</button>
+    <button class="nav-btn"        data-section="analytics-section"  onclick="showSection('analytics-section')"              aria-label="Analytics">📊 Analytics</button>
+    <button class="nav-btn"        data-section="report-section"     onclick="showSection('report-section')"                aria-label="Report Issue">📢 Report Issue</button>
+    <button class="nav-btn"        data-section="track-section"     onclick="showSection('track-section')"     aria-label="Track Complaint">🗂️ Track</button>
+    <button class="nav-btn"        data-section="authority-section" onclick="showSection('authority-section')" aria-label="Authorities">👨‍💼 Authorities</button>
+    <button class="nav-btn"        data-section="about-section"     onclick="showSection('about-section')"     aria-label="About">ℹ️ About</button>
+  </div>
+  <div class="nav-right">
+    <span class="conn-badge offline" id="offlineBadge" style="display:none" aria-live="polite">📶 Offline</span>
+    <span class="conn-badge online"  id="onlineBadge" aria-live="polite">🟢 Live</span>
+    <button class="hamburger" onclick="toggleMenu()" aria-label="Toggle menu" aria-expanded="false" id="hamburgerBtn">☰</button>
+  </div>
+</nav>
+
+<!-- ═══════════════════ DASHBOARD ════════════════════════════════════════════ -->
+<section id="dashboard" class="section active" aria-label="Dashboard">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-content">
+      <div class="hero-text">
+        <h1>Road Infrastructure.<br><span class="accent">Transparent.</span> Accountable.</h1>
+        <p>Monitor real road conditions · Track public spending with source URLs · File complaints routed to the exact Executive Engineer — across India and 12 other countries.</p>
+        <div class="hero-search-wrap">
+          <div class="hero-search" role="search">
+            <span class="search-icon" aria-hidden="true">🔍</span>
+            <input type="text" id="heroSearch" placeholder="Search: NH-44, Bengaluru, Tamil Nadu… (Ctrl+K)"
+              aria-label="Search roads"
+              oninput="debounceAutocomplete(this.value)"
+              onkeydown="if(event.key==='Enter'){closeAutocomplete();doSearch()}"/>
+            <button onclick="doSearch()" aria-label="Search">Search</button>
+          </div>
+          <div class="autocomplete-box" id="autocompleteBox" role="listbox" aria-label="Search suggestions"></div>
+        </div>
+        <div class="hero-shortcuts">
+          <button class="shortcut-chip" onclick="quickFilter('','Critical')" aria-label="Show critical roads">🔴 Critical Roads</button>
+          <button class="shortcut-chip" onclick="quickFilter('India','Poor')" aria-label="Show poor Indian roads">🇮🇳 Poor in India</button>
+          <button class="shortcut-chip" onclick="quickFilter('','Poor')" aria-label="All poor roads">⚠️ All Poor Roads</button>
+          <button class="shortcut-chip" onclick="showSection('report-section')" aria-label="Report an issue">📢 Report Issue</button>
+          <button class="shortcut-chip" onclick="showSection('analytics-section')" aria-label="View analytics">📊 Analytics</button>
+        </div>
+      </div>
+      <div class="hero-visual" aria-hidden="true">
+        <div class="hero-globe">🌏</div>
+      </div>
+    </div>
+    <!-- Stats bar -->
+    <div class="stats-bar" id="statsBar" role="region" aria-label="Platform statistics">
+      <div class="stat-item" onclick="showSection('map-section')" tabindex="0" role="button" aria-label="Total roads monitored">
+        <div class="stat-val" id="stat-roads"><div class="skel skel-stat"></div></div>
+        <div class="stat-lbl">Roads Monitored</div>
+      </div>
+      <div class="stat-item" onclick="showSection('analytics-section')" tabindex="0" role="button" aria-label="Poor and critical roads">
+        <div class="stat-val" id="stat-critical"><div class="skel skel-stat"></div></div>
+        <div class="stat-lbl">Poor / Critical Roads</div>
+      </div>
+      <div class="stat-item" onclick="showSection('track-section')" tabindex="0" role="button" aria-label="Total complaints filed">
+        <div class="stat-val" id="stat-complaints"><div class="skel skel-stat"></div></div>
+        <div class="stat-lbl">Complaints Filed</div>
+      </div>
+      <div class="stat-item" onclick="showSection('analytics-section')" tabindex="0" role="button" aria-label="Countries covered">
+        <div class="stat-val" id="stat-countries"><div class="skel skel-stat"></div></div>
+        <div class="stat-lbl">Countries Covered</div>
+      </div>
+      <div class="stat-item" onclick="showSection('analytics-section')" tabindex="0" role="button" aria-label="Budget anomalies detected">
+        <div class="stat-val anomaly" id="stat-anomalies"><div class="skel skel-stat"></div></div>
+        <div class="stat-lbl">⚠️ Budget Anomalies</div>
+      </div>
+      <div class="stat-item" onclick="showSection('analytics-section')" tabindex="0" role="button" aria-label="Total road network km">
+        <div class="stat-val" id="stat-km"><div class="skel skel-stat"></div></div>
+        <div class="stat-lbl">Network (km)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter + road grid -->
+  <div class="dash-toolbar" role="toolbar" aria-label="Filter and sort options">
+    <div class="filter-group">
+      <select id="filterCountry" onchange="loadRoads()" aria-label="Filter by country"><option value="">🌍 All Countries</option></select>
+      <select id="filterType"    onchange="loadRoads()" aria-label="Filter by road type">
+        <option value="">All Types</option>
+        <option>NH</option><option>SH</option><option>MDR</option><option>ODR</option>
+        <option>VR</option><option>Expressway</option><option>Motorway</option>
+        <option>Interstate Highway</option><option>National Route</option>
+        <option>A-Road</option><option>US Highway</option><option>European Route</option>
+      </select>
+      <select id="filterCond"    onchange="loadRoads()" aria-label="Filter by condition">
+        <option value="">All Conditions</option>
+        <option>Excellent</option><option>Good</option><option>Fair</option>
+        <option>Poor</option><option>Critical</option>
+      </select>
+      <select id="sortBy" onchange="loadRoads()" aria-label="Sort roads">
+        <option value="condition_asc">Sort: Worst First</option>
+        <option value="condition_desc">Sort: Best First</option>
+        <option value="budget_desc">Sort: Highest Budget</option>
+        <option value="name">Sort: Name A–Z</option>
+      </select>
+    </div>
+    <div class="toolbar-right">
+      <div class="view-toggle">
+        <button class="view-btn active" id="viewGrid" onclick="setView('grid')" aria-label="Grid view" title="Grid View">⊞ Grid</button>
+        <button class="view-btn" id="viewList" onclick="setView('list')" aria-label="List view" title="List View">☰ List</button>
+      </div>
+      <button class="export-btn" onclick="exportCSV()" aria-label="Export roads as CSV" title="Export CSV">⬇️ CSV</button>
+    </div>
+  </div>
+
+  <div class="results-count-bar" id="resultsCountBar" aria-live="polite"></div>
+  <div id="roadGrid" class="road-grid" role="list" aria-label="Road cards"></div>
+</section>
+
+<!-- ═══════════════════ MAP ═══════════════════════════════════════════════════ -->
+<section id="map-section" class="section" aria-label="Interactive map">
+  <div class="map-layout">
+    <div class="map-controls-bar">
+      <div class="map-search-wrap" role="search">
+        <input type="text" id="mapSearch" placeholder="Search road or location…" aria-label="Search on map"
+          oninput="debounceMapAutocomplete(this.value)"
+          onkeydown="if(event.key==='Enter')mapSearchRoad()"/>
+        <button onclick="mapSearchRoad()" aria-label="Search map">🔍</button>
+        <div class="autocomplete-box" id="mapAutocompleteBox" role="listbox"></div>
+      </div>
+      <div class="map-filter-row">
+        <select id="mapFilterType" onchange="reloadMapMarkers()" aria-label="Filter map by road type">
+          <option value="">All Types</option>
+          <option>NH</option><option>SH</option><option>MDR</option>
+          <option>Expressway</option><option>Motorway</option>
+        </select>
+        <select id="mapFilterCond" onchange="reloadMapMarkers()" aria-label="Filter map by condition">
+          <option value="">All Conditions</option>
+          <option>Critical</option><option>Poor</option><option>Fair</option>
+          <option>Good</option><option>Excellent</option>
+        </select>
+        <button class="map-locate-btn" onclick="locateMe()" title="Find roads near me" aria-label="Find roads near my location">📍 Near Me</button>
+        <button class="map-locate-btn" onclick="toggleMapFullscreen()" id="mapFullscreenBtn" title="Toggle fullscreen" aria-label="Toggle map fullscreen">⛶ Fullscreen</button>
+      </div>
+      <div class="map-legend" aria-label="Map legend">
+        <span class="leg excellent">Excellent</span>
+        <span class="leg good">Good</span>
+        <span class="leg fair">Fair</span>
+        <span class="leg poor">Poor</span>
+        <span class="leg critical">Critical</span>
+      </div>
+    </div>
+    <div class="map-body" id="mapBody">
+      <div id="map" role="application" aria-label="Road map"></div>
+      <div class="map-sidebar" id="mapSidebar">
+        <div class="sidebar-tabs" role="tablist">
+          <button class="stab active" role="tab" aria-selected="true"  onclick="setSidebarTab('info')">Road Info</button>
+          <button class="stab"        role="tab" aria-selected="false" onclick="setSidebarTab('complaints')">Complaints</button>
+          <button class="stab"        role="tab" aria-selected="false" onclick="setSidebarTab('timeline')">Timeline</button>
+        </div>
+        <div id="sidebarInfoTab" role="tabpanel">
+          <p class="sidebar-hint">📍 Click a road marker on the map or search to see full details here.</p>
+        </div>
+        <div id="sidebarComplaintsTab" role="tabpanel" style="display:none">
+          <p class="sidebar-hint">Select a road to see its complaints.</p>
+        </div>
+        <div id="sidebarTimelineTab" role="tabpanel" style="display:none">
+          <p class="sidebar-hint">Select a road to see its timeline.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ ANALYTICS ════════════════════════════════════════════ -->
+<section id="analytics-section" class="section" aria-label="Analytics">
+  <div class="analytics-container">
+    <div class="section-hdr">
+      <h2>📊 Road Infrastructure Analytics</h2>
+      <p class="section-sub">Live data across all monitored roads worldwide</p>
+      <div class="analytics-actions">
+        <button class="export-btn" onclick="exportCSV()" aria-label="Export roads CSV">⬇️ Export Roads CSV</button>
+        <button class="export-btn" onclick="exportComplaintsCSV()" aria-label="Export complaints CSV">⬇️ Export Complaints CSV</button>
+      </div>
+    </div>
+
+    <div class="analytics-tiles" id="analyticsTiles">
+      <div class="an-tile skel-tile"><div class="skel skel-h3"></div><div class="skel skel-p"></div></div>
+      <div class="an-tile skel-tile"><div class="skel skel-h3"></div><div class="skel skel-p"></div></div>
+      <div class="an-tile skel-tile"><div class="skel skel-h3"></div><div class="skel skel-p"></div></div>
+      <div class="an-tile skel-tile"><div class="skel skel-h3"></div><div class="skel skel-p"></div></div>
+      <div class="an-tile skel-tile"><div class="skel skel-h3"></div><div class="skel skel-p"></div></div>
+    </div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <h3>Road Condition Distribution</h3>
+        <div class="chart-wrap"><canvas id="condChart" aria-label="Road condition chart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Average Condition Score by Country</h3>
+        <div class="chart-wrap"><canvas id="countryChart" aria-label="Country condition chart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <h3>Complaint Severity Breakdown</h3>
+        <div class="chart-wrap"><canvas id="sevChart" aria-label="Complaint severity chart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Budget Utilisation by Road Type</h3>
+        <div class="chart-wrap"><canvas id="typeChart" aria-label="Budget utilisation chart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="chart-card full-width">
+      <h3>⚠️ Budget Anomaly Alerts <span class="badge-red" id="anomalyCount" aria-live="polite"></span></h3>
+      <p style="font-size:.83rem;color:var(--muted);margin-bottom:1rem">Roads where budget utilisation is below 65% — possible delays, mismanagement, or data gaps.</p>
+      <div id="anomalyTable" role="region" aria-label="Budget anomaly table"></div>
+    </div>
+
+    <div class="chart-card full-width">
+      <h3>🔄 Compare Roads Side-by-Side</h3>
+      <div class="compare-inputs" role="group" aria-label="Road comparison inputs">
+        <input type="text" id="cmp1" placeholder="Road ID 1 (e.g. NH-44)" aria-label="First road ID"/>
+        <input type="text" id="cmp2" placeholder="Road ID 2 (e.g. NH-16)" aria-label="Second road ID"/>
+        <input type="text" id="cmp3" placeholder="Road ID 3 (optional)"   aria-label="Third road ID"/>
+        <button onclick="compareRoads()" aria-label="Compare roads">Compare →</button>
+      </div>
+      <div id="compareResult" role="region" aria-label="Comparison results"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ REPORT ISSUE — Wizard ════════════════════════════════ -->
+<section id="report-section" class="section" aria-label="Report a road issue">
+  <div class="wizard-container">
+    <h2>📢 Report a Road Issue</h2>
+    <p class="section-sub">Your complaint will be AI-assessed and automatically routed to the correct Executive Engineer.</p>
+
+    <div class="steps-bar" role="list" aria-label="Wizard progress">
+      <div class="step active" id="step-ind-1" role="listitem"><span>1</span> Your Details</div>
+      <div class="step-line"></div>
+      <div class="step" id="step-ind-2" role="listitem"><span>2</span> Location &amp; Road</div>
+      <div class="step-line"></div>
+      <div class="step" id="step-ind-3" role="listitem"><span>3</span> Issue &amp; Photo</div>
+      <div class="step-line"></div>
+      <div class="step" id="step-ind-4" role="listitem"><span>4</span> Review &amp; Submit</div>
+    </div>
+
+    <form id="complaintForm" onsubmit="submitComplaint(event)" novalidate>
+      <!-- Step 1 -->
+      <div class="wizard-step" id="wstep-1">
+        <h3>Step 1 — Your Contact Details</h3>
+        <div class="form-grid">
+          <div class="fg"><label for="wName">Full Name <span class="req">*</span></label>
+            <input type="text" id="wName" name="citizen_name" required placeholder="Your full name" autocomplete="name"/></div>
+          <div class="fg"><label for="wPhone">Phone <span class="req">*</span></label>
+            <input type="tel" id="wPhone" name="phone" required placeholder="+91-XXXXXXXXXX" autocomplete="tel"/></div>
+          <div class="fg"><label for="wEmail">Email (for updates)</label>
+            <input type="email" id="wEmail" name="email" placeholder="you@email.com" autocomplete="email"/></div>
+          <div class="fg"><label for="wCountry">Country <span class="req">*</span></label>
+            <select id="wCountry" name="country" onchange="onCountryChange()">
+              <option>India</option><option>United Kingdom</option>
+              <option>United States</option><option>Bangladesh</option>
+              <option>South Africa</option><option>Madagascar</option>
+              <option>Poland</option><option>Other</option>
+            </select></div>
+          <div class="fg"><label for="wState">State / Province <span class="req">*</span></label>
+            <input type="text" id="wState" name="state" required placeholder="e.g. Tamil Nadu, Karnataka…"/></div>
+          <div class="fg"><label for="wDistrict">District (optional)</label>
+            <input type="text" id="wDistrict" name="district" placeholder="e.g. Chennai, Bengaluru…"/></div>
+        </div>
+        <div class="step-nav">
+          <button type="button" class="btn-next" onclick="gotoStep(2)">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="wizard-step" id="wstep-2" style="display:none">
+        <h3>Step 2 — Location &amp; Road Details</h3>
+        <div class="form-grid">
+          <div class="fg full"><label for="wLocDesc">Location Description <span class="req">*</span></label>
+            <input type="text" id="wLocDesc" name="location_desc" required
+              placeholder="e.g. NH-44 near Tambaram, 500m after toll plaza, Chennai"/></div>
+          <div class="fg"><label for="wRoadType">Road Type</label>
+            <select id="wRoadType" name="road_type">
+              <option value="NH">NH — National Highway (NHAI)</option>
+              <option value="SH">SH — State Highway (State PWD)</option>
+              <option value="MDR">MDR — Major District Road</option>
+              <option value="ODR">ODR — Other District Road</option>
+              <option value="VR">VR — Village Road</option>
+              <option value="Expressway">Expressway</option>
+              <option value="Motorway">Motorway (UK)</option>
+              <option value="Interstate Highway">Interstate Highway (USA)</option>
+              <option value="National Route">National Route (South Africa)</option>
+              <option value="European Route">European Route</option>
+              <option value="A-Road">A-Road (UK)</option>
+            </select></div>
+          <div class="fg"><label>GPS Coordinates (optional)</label>
+            <div style="display:flex;gap:.4rem;align-items:center">
+              <input type="number" name="location_lat" id="wLat" placeholder="Latitude"  step="any" aria-label="Latitude"/>
+              <input type="number" name="location_lon" id="wLon" placeholder="Longitude" step="any" aria-label="Longitude"/>
+              <button type="button" class="gps-btn" onclick="getGPS()" title="Use my GPS location" aria-label="Use my GPS location">📍</button>
+            </div></div>
+          <input type="hidden" name="road_id" id="wRoadId"/>
+          <div class="fg full">
+            <label for="wRoadSearch">Quick Road Search <span style="color:var(--muted);font-size:.8rem">(optional — auto-fills road type)</span></label>
+            <div style="position:relative">
+              <input type="text" id="wRoadSearch" placeholder="Search road by name or ID to auto-fill…" aria-label="Search for a road"
+                oninput="debounceWizardSearch(this.value)"/>
+              <div class="autocomplete-box" id="wizardAutoBox" role="listbox"></div>
+            </div>
+          </div>
+        </div>
+        <div class="step-nav">
+          <button type="button" class="btn-back" onclick="gotoStep(1)">← Back</button>
+          <button type="button" class="btn-next" onclick="gotoStep(3)">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="wizard-step" id="wstep-3" style="display:none">
+        <h3>Step 3 — Describe the Issue</h3>
+        <div class="form-grid">
+          <div class="fg"><label for="wIssueType">Issue Type <span class="req">*</span></label>
+            <select id="wIssueType" name="issue_type" required>
+              <option value="Pothole">🕳️ Pothole</option>
+              <option value="Crack">🪨 Crack / Alligator Cracking</option>
+              <option value="Missing Marking">🚧 Missing / Faded Road Markings</option>
+              <option value="Broken Barrier">⛔ Broken Crash Barrier</option>
+              <option value="Flooding">💧 Waterlogging / Flooding</option>
+              <option value="Rutting">〰️ Rutting / Surface Deformation</option>
+              <option value="Edge Break">📉 Edge Break / Shoulder Damage</option>
+              <option value="Other">📌 Other</option>
+            </select></div>
+          <div class="fg"><label for="wSeverity">Perceived Severity</label>
+            <select id="wSeverity" name="severity">
+              <option value="Low">🟢 Low — Minor inconvenience</option>
+              <option value="Medium" selected>🟡 Medium — Needs attention</option>
+              <option value="High">🟠 High — Dangerous</option>
+              <option value="Critical">🔴 Critical — Immediate hazard</option>
+            </select></div>
+          <div class="fg full"><label for="wDesc">Description <span class="req">*</span></label>
+            <textarea id="wDesc" name="description" required rows="3"
+              placeholder="Describe the issue — size, location, how long it has been there, any accidents caused…"></textarea></div>
+          <div class="fg full">
+            <label>Upload Photo <span style="color:var(--success);font-size:.82rem">← Highly Recommended (AI will assess damage)</span></label>
+            <div class="upload-zone" id="uploadZone"
+              onclick="document.getElementById('photoInput').click()"
+              ondragover="event.preventDefault();this.classList.add('drag-over')"
+              ondragleave="this.classList.remove('drag-over')"
+              ondrop="handleDrop(event)"
+              role="button" tabindex="0" aria-label="Upload photo"
+              onkeydown="if(event.key==='Enter'||event.key===' ')document.getElementById('photoInput').click()">
+              <div id="uploadPreview">
+                <div class="upload-icon" aria-hidden="true">📷</div>
+                <div>Click to upload or <strong>drag &amp; drop</strong> a photo</div>
+                <div style="font-size:.75rem;opacity:0.6;margin-top:.3rem">Supports JPG, PNG, WEBP · Max 10 MB</div>
+              </div>
+              <input type="file" name="image" id="photoInput" accept="image/*"
+                style="display:none" onchange="previewImage(this)" aria-label="Photo upload input"/>
+            </div>
+          </div>
+        </div>
+        <div class="step-nav">
+          <button type="button" class="btn-back" onclick="gotoStep(2)">← Back</button>
+          <button type="button" class="btn-next" onclick="gotoStep(4)">Review →</button>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="wizard-step" id="wstep-4" style="display:none">
+        <h3>Step 4 — Review &amp; Submit</h3>
+        <div id="reviewPanel" class="review-panel" aria-live="polite"></div>
+        <div id="routingPreview" class="routing-preview" aria-live="polite"></div>
+        <div class="step-nav">
+          <button type="button" class="btn-back" onclick="gotoStep(3)">← Back</button>
+          <button type="submit" class="btn-submit" id="submitBtn" aria-label="File complaint">
+            📢 File Complaint &amp; Route to Authority
+          </button>
+        </div>
+      </div>
+    </form>
+
+    <div id="complaintResult" style="display:none" role="alert" aria-live="assertive"></div>
+  </div>
+</section>
+
+<!-- ═══════════════════ TRACK COMPLAINTS ═════════════════════════════════════ -->
+<section id="track-section" class="section" aria-label="Track complaints">
+  <div class="container">
+    <div class="section-hdr">
+      <h2>🗂️ Complaint Tracker</h2>
+      <p class="section-sub">Track your complaint status or browse all recent complaints</p>
+    </div>
+
+    <div class="track-tabs">
+      <button class="track-tab active" id="ttab-id"    onclick="switchTrackTab('id')"    aria-label="Search by complaint ID">By Complaint ID</button>
+      <button class="track-tab"        id="ttab-phone" onclick="switchTrackTab('phone')" aria-label="Search by phone">By Phone Number</button>
+    </div>
+
+    <div id="trackById">
+      <div class="track-search-bar">
+        <input type="text" id="trackId" placeholder="Enter Complaint ID  e.g.  RW-2026-00001" aria-label="Complaint ID"
+          onkeydown="if(event.key==='Enter')trackComplaint()"/>
+        <button onclick="trackComplaint()" aria-label="Track complaint">🔍 Track</button>
+      </div>
+    </div>
+
+    <div id="trackByPhone" style="display:none">
+      <div class="track-search-bar">
+        <input type="tel" id="trackPhone" placeholder="Enter your phone number  e.g.  +91-9876543210" aria-label="Phone number"
+          onkeydown="if(event.key==='Enter')trackByPhone()"/>
+        <button onclick="trackByPhone()" aria-label="Find complaints by phone">🔍 Find My Complaints</button>
+      </div>
+    </div>
+
+    <div id="trackResult" aria-live="polite"></div>
+
+    <div class="comp-feed-header">
+      <h3>Recent Complaints</h3>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+        <select id="filterCompStatus" onchange="loadComplaints()" aria-label="Filter by status">
+          <option value="">All Status</option>
+          <option>Filed</option><option>Acknowledged</option>
+          <option>In Progress</option><option>Resolved</option>
+        </select>
+        <select id="filterCompSev" onchange="loadComplaints()" aria-label="Filter by severity">
+          <option value="">All Severity</option>
+          <option>Critical</option><option>High</option>
+          <option>Medium</option><option>Low</option>
+        </select>
+        <button class="export-btn" onclick="exportComplaintsCSV()" aria-label="Export complaints CSV" style="margin-left:auto">⬇️ Export</button>
+      </div>
+    </div>
+    <div id="complaintsList" role="list" aria-label="Complaints list"></div>
+  </div>
+</section>
+
+<!-- ═══════════════════ AUTHORITY DIRECTORY ══════════════════════════════════ -->
+<section id="authority-section" class="section" aria-label="Authority directory">
+  <div class="container">
+    <div class="section-hdr">
+      <h2>👨‍💼 Authority Directory</h2>
+      <p class="section-sub">Find the correct Executive Engineer or authority for any road type and location</p>
+    </div>
+
+    <div class="auth-filters" role="group" aria-label="Authority filters">
+      <select id="authCountry" onchange="loadAuthorities()" aria-label="Filter by country">
+        <option value="">🌍 All Countries</option>
+        <option>India</option><option>United Kingdom</option>
+        <option>United States</option><option>Bangladesh</option>
+        <option>South Africa</option><option>Madagascar</option>
+        <option>Poland</option><option>Germany</option>
+        <option>Australia</option><option>Nigeria</option>
+        <option>Kenya</option><option>Japan</option><option>Malaysia</option>
+      </select>
+      <select id="authType" onchange="loadAuthorities()" aria-label="Filter by road type">
+        <option value="">All Road Types</option>
+        <option>NH</option><option>SH</option><option>MDR</option>
+        <option>ODR</option><option>VR</option><option>Expressway</option>
+        <option>Motorway</option><option>Interstate Highway</option>
+        <option>National Route</option><option>A-Road</option>
+        <option>European Route</option><option>Autobahn</option>
+        <option>PMGSY</option>
+      </select>
+      <input type="text" id="authSearch" placeholder="Search by name or department…"
+        oninput="loadAuthorities()" style="padding:.45rem .75rem;border:1px solid var(--border);border-radius:7px;font-size:.85rem;flex:1;min-width:160px"
+        aria-label="Search authorities"/>
+    </div>
+
+    <div id="authorityList" class="authority-grid" role="list" aria-label="Authority cards"></div>
+  </div>
+</section>
+
+<!-- ═══════════════════ ABOUT ════════════════════════════════════════════════ -->
+<section id="about-section" class="section" aria-label="About RoadWatch">
+  <div class="container about-page">
+    <div class="section-hdr">
+      <h2>About RoadWatch</h2>
+      <p class="section-sub">Built for the National Road Safety Hackathon 2026 · CoERS, IIT Madras · Track: RoadWatch</p>
+    </div>
+
+    <div class="about-lead-card">
+      <p>RoadWatch addresses the <strong>accountability gap</strong> in India's road infrastructure — the disconnect between money sanctioned, money spent, and actual road quality. Citizens have no effective way to monitor contractor performance, verify public spending, or report defects to the right authority. RoadWatch closes this gap with AI.</p>
+    </div>
+
+    <div class="about-grid">
+      <div class="about-feat"><div class="feat-icon" aria-hidden="true">🗺️</div><h3>Road Data Accuracy</h3><p>Every road has: road type, contractor name &amp; contact, Executive Engineer, last relaying date, construction year, surface type — all with official source URLs.</p></div>
+      <div class="about-feat"><div class="feat-icon" aria-hidden="true">💰</div><h3>Budget Transparency</h3><p>Sanctioned vs. spent per financial year with official government source links. Anomaly detection auto-flags under-utilised budgets below 65% — indicating possible delays or mismanagement.</p></div>
+      <div class="about-feat"><div class="feat-icon" aria-hidden="true">📢</div><h3>Smart Complaint Routing</h3><p>4-step complaint wizard. AI + Authority database lookup routes every complaint to the exact Executive Engineer based on road type + state + country. Zero wrong departments.</p></div>
+      <div class="about-feat"><div class="feat-icon" aria-hidden="true">📷</div><h3>AI Damage Assessment</h3><p>Upload a road photo — AI (Groq LLaMA 3.1 → GPT-4 → rule-based fallback) classifies damage type (pothole, crack, rutting…) and assigns a severity score 1–10.</p></div>
+      <div class="about-feat"><div class="feat-icon" aria-hidden="true">🤖</div><h3>AI Road Chatbot</h3><p>Ask in natural language: "Who is the EE for NH-44?", "Show MDR-23 budget", "Which roads are critical in Tamil Nadu?" — instant AI answers backed by live database.</p></div>
+      <div class="about-feat"><div class="feat-icon" aria-hidden="true">🌍</div><h3>Global Coverage</h3><p>13 countries: India (NHAI/PWD/PMGSY), UK, USA, Bangladesh, South Africa, Madagascar, Poland, Germany, Australia, Nigeria, Kenya, Japan, Malaysia — with local authorities.</p></div>
+      <div class="about-feat"><div class="feat-icon" aria-hidden="true">📶</div><h3>Offline / PWA</h3><p>Service Worker caches all road data, stats, authorities. Works in low-connectivity rural areas. Installable as a mobile app from the browser.</p></div>
+      <div class="about-feat"><div class="feat-icon" aria-hidden="true">📊</div><h3>Analytics &amp; Export</h3><p>Live charts: condition distribution, avg score by country, complaint severity breakdown, budget utilisation by road type. CSV export for roads and complaints.</p></div>
+    </div>
+
+    <div class="evaluation-card">
+      <h3>✅ Evaluation Criteria Coverage</h3>
+      <div class="eval-grid">
+        <div class="eval-item"><span class="eval-check">✔</span><div><strong>Data Accuracy</strong><br><small>Road type, contractor, EE, last relaying date — all stored with source labels and source URLs</small></div></div>
+        <div class="eval-item"><span class="eval-check">✔</span><div><strong>Correct Complaint Routing</strong><br><small>AI + Authority DB lookup → correct Executive Engineer every time</small></div></div>
+        <div class="eval-item"><span class="eval-check">✔</span><div><strong>Budget Transparency with Source</strong><br><small>Sanctioned vs spent per FY with source URL; anomaly auto-flagged &lt;65%</small></div></div>
+        <div class="eval-item"><span class="eval-check">✔</span><div><strong>Global / Cross-Country</strong><br><small>13 countries, localised authorities, multi-currency (INR/USD/GBP/BDT/ZAR/PLN/MGA), country-specific routing</small></div></div>
+        <div class="eval-item"><span class="eval-check">✔</span><div><strong>Offline Functionality</strong><br><small>Service Worker PWA: roads + stats cached; works without internet</small></div></div>
+        <div class="eval-item"><span class="eval-check">✔</span><div><strong>UI &amp; Accessibility</strong><br><small>Responsive, ARIA labels, keyboard navigation, screen-reader support, WCAG contrast</small></div></div>
+      </div>
+    </div>
+
+    <div class="data-sources-card">
+      <h3>📌 Data Sources</h3>
+      <div class="sources-grid">
+        <div><strong>India</strong><br>NHAI Project Portal (nhai.gov.in)<br>Maharashtra PWD (mahapwd.gov.in)<br>Tamil Nadu Highways (tnhighways.gov.in)<br>Delhi PWD (delhipwd.gov.in)<br>Rajasthan PWD (rajpwd.gov.in)<br>Karnataka PWD (kpwd.gov.in)<br>PMGSY Portal (pmgsy.nic.in)<br>MoRTH Annual Reports (morth.nic.in)</div>
+        <div><strong>International</strong><br>National Highways England (nationalhighways.co.uk)<br>Transport Scotland (transport.gov.scot)<br>FDOT Florida (fdot.gov)<br>Caltrans California (dot.ca.gov)<br>RHD Bangladesh (rhd.gov.bd)<br>SANRAL South Africa (nra.co.za)<br>GDDKiA Poland (gddkia.gov.pl)<br>Madagascar MTPM (mtpm.mg)</div>
+        <div><strong>Reference</strong><br>iRAD Crash Database (IISC/MoRTH)<br>OpenStreetMap (openstreetmap.org)<br>MoRTH Road Accident Report 2023<br>World Bank India Road Safety Study<br>iRAP India Road Ratings<br>Bhashini API (MeitY)<br>CPGRAMS Grievance Portal</div>
+      </div>
+    </div>
+
+    <div class="tech-card">
+      <h3>⚙️ Technology Stack</h3>
+      <div class="tech-tags">
+        <span>Python 3.12</span><span>FastAPI</span><span>SQLAlchemy</span><span>SQLite</span>
+        <span>Groq LLaMA 3.1</span><span>OpenAI GPT-4o-mini</span>
+        <span>Leaflet.js</span><span>Chart.js</span><span>Service Worker PWA</span>
+        <span>Vanilla JS ES6+</span><span>CSS3 Flexbox/Grid</span>
+      </div>
+    </div>
+
+    <div class="keyboard-card">
+      <h3>⌨️ Keyboard Shortcuts</h3>
+      <div class="shortcut-list">
+        <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>K</kbd> <span>Focus hero search bar</span></div>
+        <div class="shortcut-row"><kbd>Esc</kbd>               <span>Close modal / chat</span></div>
+        <div class="shortcut-row"><kbd>Enter</kbd>             <span>Submit search / send chat</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ CHATBOT ══════════════════════════════════════════════ -->
+<div class="chatbot-fab" id="chatFab" onclick="toggleChat()" role="button" tabindex="0" aria-label="Open AI chatbot" onkeydown="if(event.key==='Enter')toggleChat()" title="Chat with RoadWatch AI">
+  <span class="fab-icon" aria-hidden="true">🤖</span>
+  <span class="fab-unread" id="fabUnread" aria-label="1 new message">1</span>
+</div>
+
+<div class="chat-window" id="chatWindow" role="dialog" aria-label="RoadWatch AI chat" aria-modal="true">
+  <div class="chat-header">
+    <div class="chat-header-left">
+      <div class="chat-avatar" aria-hidden="true">🤖</div>
+      <div>
+        <div class="chat-title">RoadWatch AI Assistant</div>
+        <div class="chat-subtitle" id="chatSubtitle">● Initialising…</div>
+      </div>
+    </div>
+    <button class="chat-close-btn" onclick="toggleChat()" aria-label="Close chat">✕</button>
+  </div>
+
+  <div class="chat-msgs" id="chatMsgs" role="log" aria-live="polite" aria-label="Chat messages">
+    <div class="chat-msg bot">
+      <div class="msg-bubble">
+        👋 <strong>Welcome to RoadWatch AI!</strong><br><br>
+        I monitor <strong>35 roads across 13 countries</strong> and can help you with:<br><br>
+        🔍 Road condition &amp; quality scores<br>
+        💰 Budget utilisation &amp; anomalies<br>
+        👨‍💼 Executive Engineer contacts<br>
+        📢 Filing &amp; tracking complaints<br>
+        🗺️ Location and route details<br><br>
+        <em>Try one of the suggestions below or type your question!</em>
+      </div>
+    </div>
+  </div>
+
+  <div class="chat-suggestions" id="chatSuggestions" role="group" aria-label="Quick suggestions">
+    <button onclick="quickChat('Show me full details of NH-44 — condition, contractor, budget and Executive Engineer')" aria-label="NH-44 details">🔍 NH-44 details</button>
+    <button onclick="quickChat('Which roads have critical or poor condition right now?')" aria-label="Critical roads">⚠️ Critical roads</button>
+    <button onclick="quickChat('Which roads have budget anomalies below 65% utilisation?')" aria-label="Budget anomalies">💰 Budget anomalies</button>
+    <button onclick="quickChat('How do I report a road defect and who will it go to?')" aria-label="Report issue">📢 How to report</button>
+  </div>
+
+  <div class="chat-input-area">
+    <input type="text" id="chatInput" placeholder="Ask about any road…" aria-label="Chat message input"
+      onkeydown="if(event.key==='Enter')sendChat()"/>
+    <button class="chat-send-btn" onclick="sendChat()" aria-label="Send message">➤</button>
+  </div>
+</div>
+
+<!-- Road Detail Modal -->
+<div class="modal-overlay" id="roadModal" onclick="if(event.target===this)closeModal()" role="dialog" aria-modal="true" aria-label="Road details">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal()" aria-label="Close modal">✕</button>
+    <div id="modalContent"><div class="loading-ph">Loading…</div></div>
+  </div>
+</div>
+
+<!-- Toast notifications -->
+<div id="toastContainer" role="alert" aria-live="assertive" aria-atomic="true"></div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
