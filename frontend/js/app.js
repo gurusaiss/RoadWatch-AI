@@ -424,29 +424,34 @@ function findNearMe() {
   );
 }
 
-function clearNearMe() {
+function clearNearMe(skipReload = false) {
+  if (!_nearMeActive && skipReload) return;  // nothing to clear
   _nearMeActive = false;
   const btn = $('nearMeBtn');
-  btn.classList.remove('active-loc', 'loading');
-  btn.innerHTML = '<span class="near-me-icon">📍</span> Near Me';
-  $('nearMeBar').style.display = 'none';
-  loadRoads(); // restore normal road list
+  if (btn) {
+    btn.classList.remove('active-loc', 'loading');
+    btn.innerHTML = '<span class="near-me-icon">📍</span> Near Me';
+  }
+  const bar = $('nearMeBar');
+  if (bar) bar.style.display = 'none';
+  if (!skipReload) loadRoads(); // restore normal road list
 }
 
 function renderNearbyRoads(roads) {
-  const grid = $('roadsGrid');
+  const grid = $('roadGrid');   // correct element ID
   if (!grid) return;
   grid.innerHTML = roads.map(r => {
-    const util = r.distance_km !== undefined
-      ? `<span class="road-dist">📍 ${r.distance_km} km away</span>` : '';
+    const dist  = r.distance_km !== undefined
+      ? `<div class="road-dist-badge">📍 ${r.distance_km} km away</div>` : '';
     const cond  = r.condition_label || 'Unknown';
     const score = r.condition_score ?? '—';
     const san   = r.budget_sanctioned;
     const sp    = r.budget_spent;
     const anomaly = san > 0 && sp > 0 && (sp / san) < 0.65;
     return `
-      <div class="road-card ${condClass(cond)}" onclick="openRoadModal('${r.road_id}')" tabindex="0"
+      <div class="road-card ${condClass(cond)} near-me-card" onclick="openRoadModal('${r.road_id}')" tabindex="0"
            role="button" aria-label="${r.road_name}">
+        ${dist}
         <div class="road-card-header">
           <div>
             <div class="road-id">${r.road_id}</div>
@@ -463,27 +468,19 @@ function renderNearbyRoads(roads) {
           <div class="rs"><span class="rs-val">${r.total_length_km ?? '—'}</span><span class="rs-lbl">km</span></div>
           <div class="rs"><span class="rs-val">${fmtAmt(san, r.currency)}</span><span class="rs-lbl">Sanctioned</span></div>
         </div>
-        ${util}
       </div>`;
   }).join('');
-  // Add distance label style if not present
-  if (!document.getElementById('nearDistStyle')) {
-    const s = document.createElement('style');
-    s.id = 'nearDistStyle';
-    s.textContent = `.road-dist{display:block;font-size:.78rem;color:var(--success);font-weight:600;
-      padding:.3rem .75rem .5rem;border-top:1px solid var(--border);margin-top:.4rem}`;
-    document.head.appendChild(s);
-  }
 }
 
 /* ═══════════════ SEARCH ════════════════════════════════════════════════ */
 function doSearch() {
   const q = $('heroSearch').value.trim();
   closeAutocomplete();
-  if (!q) return;
-  showSection('map-section');
-  if (!window._mapInit) initMap();
-  setTimeout(() => mapSearchByQuery(q), 400);
+  clearNearMe(true);      // reset Near Me state without reloading (we reload below)
+  showSection('dashboard');
+  loadRoads();            // loadRoads reads heroSearch value → filters grid
+  // Also update map if already initialised
+  if (q && window._mapInit) mapSearchByQuery(q);
 }
 
 /* ═══════════════ ROAD MODAL ════════════════════════════════════════════ */

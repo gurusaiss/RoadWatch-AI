@@ -126,6 +126,22 @@ button{cursor:pointer;font-family:inherit}
 }
 .near-me-clear:hover{background:rgba(16,185,129,.15)}
 
+/* ── Near Me card highlight + distance badge ────────────────────────────── */
+.near-me-card{
+  border:2px solid #f59e0b !important;
+  box-shadow:0 0 0 3px rgba(245,158,11,.18), var(--shadow) !important;
+}
+.road-dist-badge{
+  display:flex;align-items:center;gap:.35rem;
+  background:linear-gradient(90deg,#f59e0b,#f97316);
+  color:#fff;
+  font-size:.8rem;font-weight:800;
+  padding:.32rem .85rem;
+  border-radius:7px 7px 0 0;
+  letter-spacing:.02em;
+  margin:-1px -1px 0 -1px;   /* flush to card top edge */
+}
+
 .autocomplete-box{position:absolute;top:100%;left:0;right:0;background:#fff;
   border-radius:0 0 10px 10px;box-shadow:var(--shadow-lg);z-index:500;
   max-height:240px;overflow-y:auto;border:1px solid var(--border);border-top:none}
