@@ -364,6 +364,118 @@ document.addEventListener('click', e => {
 
 function closeAutocomplete() { $('autocompleteBox').innerHTML = ''; }
 
+/* ═══════════════ NEAR ME ════════════════════════════════════════════════ */
+let _nearMeActive = false;
+
+function findNearMe() {
+  const btn = $('nearMeBtn');
+  if (!navigator.geolocation) {
+    toast('Geolocation not supported by your browser.', 'error');
+    return;
+  }
+  // Toggle off if already active
+  if (_nearMeActive) { clearNearMe(); return; }
+
+  btn.classList.add('loading');
+  btn.innerHTML = '<span class="near-me-icon">⏳</span> Locating…';
+
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const { latitude: lat, longitude: lon } = pos.coords;
+      btn.classList.remove('loading');
+      try {
+        const res = await fetch(`${API}/api/roads/nearby?lat=${lat}&lon=${lon}&radius_km=200`);
+        const roads = await res.json();
+        if (!roads || roads.length === 0) {
+          toast('No monitored roads found within 200 km of your location.', '');
+          btn.innerHTML = '<span class="near-me-icon">📍</span> Near Me';
+          return;
+        }
+        _nearMeActive = true;
+        btn.classList.add('active-loc');
+        btn.innerHTML = '<span class="near-me-icon">📍</span> Near Me ✓';
+
+        // Show status bar
+        const bar = $('nearMeBar');
+        bar.style.display = 'flex';
+        $('nearMeLabel').textContent =
+          `📍 ${roads.length} road${roads.length > 1 ? 's' : ''} within 200 km of your location`;
+
+        // Render the nearby roads in the grid
+        renderNearbyRoads(roads);
+        toast(`Found ${roads.length} roads near you!`, 'success');
+      } catch (err) {
+        toast('Could not fetch nearby roads. Try again.', 'error');
+        btn.innerHTML = '<span class="near-me-icon">📍</span> Near Me';
+        btn.classList.remove('loading');
+      }
+    },
+    (err) => {
+      btn.classList.remove('loading');
+      btn.innerHTML = '<span class="near-me-icon">📍</span> Near Me';
+      const msgs = {
+        1: 'Location access denied. Please allow location in your browser settings.',
+        2: 'Location unavailable. Try again.',
+        3: 'Location request timed out.',
+      };
+      toast(msgs[err.code] || 'Location error.', 'error');
+    },
+    { timeout: 10000, maximumAge: 60000 }
+  );
+}
+
+function clearNearMe() {
+  _nearMeActive = false;
+  const btn = $('nearMeBtn');
+  btn.classList.remove('active-loc', 'loading');
+  btn.innerHTML = '<span class="near-me-icon">📍</span> Near Me';
+  $('nearMeBar').style.display = 'none';
+  loadRoads(); // restore normal road list
+}
+
+function renderNearbyRoads(roads) {
+  const grid = $('roadsGrid');
+  if (!grid) return;
+  grid.innerHTML = roads.map(r => {
+    const util = r.distance_km !== undefined
+      ? `<span class="road-dist">📍 ${r.distance_km} km away</span>` : '';
+    const cond  = r.condition_label || 'Unknown';
+    const score = r.condition_score ?? '—';
+    const san   = r.budget_sanctioned;
+    const sp    = r.budget_spent;
+    const anomaly = san > 0 && sp > 0 && (sp / san) < 0.65;
+    return `
+      <div class="road-card ${condClass(cond)}" onclick="openRoadModal('${r.road_id}')" tabindex="0"
+           role="button" aria-label="${r.road_name}">
+        <div class="road-card-header">
+          <div>
+            <div class="road-id">${r.road_id}</div>
+            <div class="road-name">${r.road_name}</div>
+            <div class="road-meta">${r.country}${r.state ? ' · ' + r.state : ''}</div>
+          </div>
+          <div class="road-badges">
+            <span class="cond-badge ${condClass(cond)}">${cond}</span>
+            ${anomaly ? '<span class="anom-badge" title="Budget anomaly">⚠️ Anomaly</span>' : ''}
+          </div>
+        </div>
+        <div class="road-stats">
+          <div class="rs"><span class="rs-val">${score}</span><span class="rs-lbl">Score</span></div>
+          <div class="rs"><span class="rs-val">${r.total_length_km ?? '—'}</span><span class="rs-lbl">km</span></div>
+          <div class="rs"><span class="rs-val">${fmtAmt(san, r.currency)}</span><span class="rs-lbl">Sanctioned</span></div>
+        </div>
+        ${util}
+      </div>`;
+  }).join('');
+  // Add distance label style if not present
+  if (!document.getElementById('nearDistStyle')) {
+    const s = document.createElement('style');
+    s.id = 'nearDistStyle';
+    s.textContent = `.road-dist{display:block;font-size:.78rem;color:var(--success);font-weight:600;
+      padding:.3rem .75rem .5rem;border-top:1px solid var(--border);margin-top:.4rem}`;
+    document.head.appendChild(s);
+  }
+}
+
 /* ═══════════════ SEARCH ════════════════════════════════════════════════ */
 function doSearch() {
   const q = $('heroSearch').value.trim();

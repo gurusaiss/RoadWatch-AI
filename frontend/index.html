@@ -77,8 +77,16 @@
               oninput="debounceAutocomplete(this.value)"
               onkeydown="if(event.key==='Enter'){closeAutocomplete();doSearch()}"/>
             <button onclick="doSearch()" aria-label="Search">Search</button>
+            <button class="near-me-btn" id="nearMeBtn" onclick="findNearMe()" aria-label="Find roads near my location" title="Show roads near my current location">
+              <span class="near-me-icon">📍</span> Near Me
+            </button>
           </div>
           <div class="autocomplete-box" id="autocompleteBox" role="listbox" aria-label="Search suggestions"></div>
+          <!-- Near Me status bar (hidden until used) -->
+          <div class="near-me-bar" id="nearMeBar" style="display:none" role="status" aria-live="polite">
+            <span id="nearMeLabel">📍 Showing roads near you</span>
+            <button class="near-me-clear" onclick="clearNearMe()" aria-label="Clear location filter">✕ Clear</button>
+          </div>
         </div>
         <div class="hero-shortcuts">
           <button class="shortcut-chip" onclick="quickFilter('','Critical')" aria-label="Show critical roads">🔴 Critical Roads</button>
