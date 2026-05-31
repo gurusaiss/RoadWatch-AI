@@ -409,7 +409,7 @@ function findNearMe() {
         updateStatsForNearMe(roads);
 
         // Render the nearby roads in the grid
-        renderNearbyRoads(roads);
+        renderNearbyRoads(roads, 'your location');
         toast(`📍 Found ${roads.length} road${roads.length > 1 ? 's' : ''} near you!`, 'success');
       } catch (err) {
         toast('Could not fetch nearby roads. Try again.', 'error');
@@ -488,13 +488,13 @@ function updateStatsForNearMe(roads) {
   set('stat-km',         fmt(Math.round(totalKm)));
 }
 
-function renderNearbyRoads(roads) {
+function renderNearbyRoads(roads, locationLabel = 'your location') {
   const grid = $('roadGrid');
   if (!grid) return;
 
   // Update results count bar
   const cb = $('resultsCountBar');
-  if (cb) cb.innerHTML = `<span>📍 Showing <strong>${roads.length}</strong> road${roads.length !== 1 ? 's' : ''} near your location <span class="rc-chip">Within 200 km</span></span>`;
+  if (cb) cb.innerHTML = `<span>📍 Showing <strong>${roads.length}</strong> road${roads.length !== 1 ? 's' : ''} near <strong>${locationLabel}</strong> <span class="rc-chip">Nearest first</span></span>`;
 
   if (roads.length === 0) {
     grid.innerHTML = `<div class="empty-state"><div class="es-icon">📍</div><h3>No roads found nearby</h3><p>No monitored roads within 200 km of your location.</p><button class="btn-next" onclick="clearNearMe()">Show All Roads</button></div>`;
@@ -535,14 +535,100 @@ function renderNearbyRoads(roads) {
 }
 
 /* ═══════════════ SEARCH ════════════════════════════════════════════════ */
-function doSearch() {
+// Road-ID pattern: NH-44, SH-5, M25, I-90, A1, B4501, AH1 …
+const _ROAD_ID_RE = /^(NH|SH|MDR|VR|ODR|PMGSY|M\d|A\d|B\d|I-|US-|AH|RN|E\d|N\d)/i;
+
+async function doSearch() {
   const q = $('heroSearch').value.trim();
   closeAutocomplete();
-  clearNearMe(true);      // reset Near Me state without reloading (we reload below)
+  if (!q) { clearNearMe(true); loadRoads(); return; }
+
   showSection('dashboard');
-  loadRoads();            // loadRoads reads heroSearch value → filters grid
-  // Also update map if already initialised
-  if (q && window._mapInit) mapSearchByQuery(q);
+
+  // ── Road ID? → normal DB text search ───────────────────────────────────
+  if (_ROAD_ID_RE.test(q)) {
+    clearNearMe(true);
+    loadRoads();
+    return;
+  }
+
+  // ── Place name → geocode → nearby roads ────────────────────────────────
+  const grid = $('roadGrid');
+  if (grid) grid.innerHTML = `
+    <div class="search-geocoding-state">
+      <div class="sgeo-spinner"></div>
+      <div class="sgeo-text">🔍 Looking up "<strong>${q}</strong>" …</div>
+    </div>`;
+  const cb = $('resultsCountBar');
+  if (cb) cb.innerHTML = '';
+
+  try {
+    // 1. Geocode via Nominatim (OpenStreetMap) — free, no key
+    const geoRes = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&addressdetails=1`,
+      { headers: { 'Accept-Language': 'en' } }
+    );
+    const geoData = await geoRes.json();
+
+    if (!geoData || geoData.length === 0) {
+      // Geocoding failed — fall back to DB text search
+      clearNearMe(true);
+      loadRoads();
+      toast(`Could not locate "${q}" — showing database matches instead.`, '');
+      return;
+    }
+
+    const place = geoData[0];
+    const lat   = parseFloat(place.lat);
+    const lon   = parseFloat(place.lon);
+    const displayName = place.address?.city || place.address?.town ||
+                        place.address?.village || place.address?.county ||
+                        place.display_name.split(',')[0];
+
+    // 2. Find nearby roads (up to 500 km for place searches)
+    const nearRes = await fetch(`${API}/api/roads/nearby?lat=${lat}&lon=${lon}&radius_km=500`);
+    const nearRoads = await nearRes.json();
+
+    if (!nearRoads || nearRoads.length === 0) {
+      // No nearby roads — fall back to DB text search
+      clearNearMe(true);
+      loadRoads();
+      toast(`No monitored roads found near "${displayName}". Showing all matches.`, '');
+      return;
+    }
+
+    // 3. Activate Near Me mode with this searched location
+    _nearMeActive = true;
+    const btn = $('nearMeBtn');
+    if (btn) { btn.classList.add('active-loc'); btn.innerHTML = '<span class="near-me-icon">📍</span> Near Me ✓'; }
+
+    const bar = $('nearMeBar');
+    if (bar) {
+      bar.style.display = 'flex';
+      $('nearMeLabel').textContent =
+        `📍 ${nearRoads.length} road${nearRoads.length !== 1 ? 's' : ''} near "${displayName}"`;
+    }
+
+    setNearMeFilterMode(true);
+    updateStatsForNearMe(nearRoads);
+    renderNearbyRoads(nearRoads, displayName);
+
+    // Update results count with location info
+    if (cb) cb.innerHTML = `<span>📍 <strong>${nearRoads.length}</strong> road${nearRoads.length !== 1 ? 's' : ''} near <strong>${displayName}</strong> <span class="rc-chip">Within 500 km</span></span>`;
+
+    toast(`📍 ${nearRoads.length} road${nearRoads.length !== 1 ? 's' : ''} found near "${displayName}"`, 'success');
+
+    // Also pan map if open
+    if (window._map && window._mapInit) {
+      window._map.setView([lat, lon], 9);
+    }
+
+  } catch (err) {
+    // Network error — fall back to text search
+    clearNearMe(true);
+    loadRoads();
+    toast('Geocoding unavailable — showing database matches.', '');
+  }
 }
 
 /* ═══════════════ ROAD MODAL ════════════════════════════════════════════ */

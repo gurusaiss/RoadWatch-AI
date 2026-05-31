@@ -146,6 +146,19 @@ button{cursor:pointer;font-family:inherit}
 }
 .nm-filter-clear:hover{background:rgba(255,255,255,.4)}
 
+/* ── Geocoding loading state ─────────────────────────────────────────────── */
+.search-geocoding-state{
+  grid-column:1/-1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:1rem;padding:3rem 1rem;
+}
+.sgeo-spinner{
+  width:40px;height:40px;border:4px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;
+  animation:spin .7s linear infinite;
+}
+.sgeo-text{font-size:1rem;color:var(--muted);text-align:center}
+@keyframes spin{to{transform:rotate(360deg)}}
+
 /* ── Near Me card highlight + distance badge ────────────────────────────── */
 .near-me-card{
   border:2px solid #f59e0b !important;
