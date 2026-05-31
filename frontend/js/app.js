@@ -305,11 +305,91 @@ function exportComplaintsCSV() {
 function debounceAutocomplete(val) {
   clearTimeout(_acTimer);
   if (val.length < 2) { $('autocompleteBox').innerHTML = ''; return; }
-  _acTimer = setTimeout(() => fetchAC(val, 'autocompleteBox', road => {
-    $('heroSearch').value = road.road_id;
-    $('autocompleteBox').innerHTML = '';
-    doSearch();
-  }), 250);
+  _acTimer = setTimeout(() => fetchACWithLocations(val), 300);
+}
+
+// Combined: road DB results + Nominatim location suggestions
+async function fetchACWithLocations(q) {
+  const box = $('autocompleteBox');
+  box.innerHTML = '';
+
+  // Run both fetches in parallel
+  const [roadItems, geoItems] = await Promise.allSettled([
+    fetch(`${API}/api/roads/search/autocomplete?q=${encodeURIComponent(q)}`).then(r => r.json()).catch(() => []),
+    _ROAD_ID_RE.test(q) ? Promise.resolve([]) :   // skip geocode for road IDs
+      fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=4&addressdetails=1`,
+            { headers: { 'Accept-Language': 'en' } })
+        .then(r => r.json()).catch(() => [])
+  ]);
+
+  const roads  = roadItems.status  === 'fulfilled' ? (roadItems.value  || []) : [];
+  const places = geoItems.status   === 'fulfilled' ? (geoItems.value   || []) : [];
+
+  if (!roads.length && !places.length) return;
+
+  // ── Road results ─────────────────────────────────────────────────────────
+  if (roads.length) {
+    const hdr = document.createElement('div');
+    hdr.className = 'ac-section-hdr';
+    hdr.textContent = '🛣️ Roads in Database';
+    box.appendChild(hdr);
+
+    roads.forEach(road => {
+      const div = document.createElement('div');
+      div.className = 'ac-item';
+      div.setAttribute('role', 'option'); div.setAttribute('tabindex', '0');
+      div.innerHTML = `
+        <span class="ac-road-id">${road.road_id}</span>
+        <span>${road.road_name} · ${road.state || ''}, ${road.country}</span>
+        <span class="ac-cond ${condClass(road.condition_label)}">${road.condition_label || '?'}</span>`;
+      const select = () => {
+        $('heroSearch').value = road.road_id;
+        box.innerHTML = '';
+        doSearch();
+      };
+      div.addEventListener('click', select);
+      div.addEventListener('keydown', e => { if (e.key === 'Enter') select(); });
+      box.appendChild(div);
+    });
+  }
+
+  // ── Location suggestions ──────────────────────────────────────────────────
+  if (places.length) {
+    const hdr2 = document.createElement('div');
+    hdr2.className = 'ac-section-hdr';
+    hdr2.textContent = '📍 Locations — find nearest roads';
+    box.appendChild(hdr2);
+
+    places.forEach(place => {
+      const label = buildPlaceLabel(place);
+      const div = document.createElement('div');
+      div.className = 'ac-item ac-place';
+      div.setAttribute('role', 'option'); div.setAttribute('tabindex', '0');
+      div.innerHTML = `
+        <span class="ac-place-icon">📍</span>
+        <span class="ac-place-name">${label.name}</span>
+        <span class="ac-place-sub">${label.sub}</span>`;
+      const select = () => {
+        $('heroSearch').value = label.name;
+        box.innerHTML = '';
+        doSearch();
+      };
+      div.addEventListener('click', select);
+      div.addEventListener('keydown', e => { if (e.key === 'Enter') select(); });
+      box.appendChild(div);
+    });
+  }
+}
+
+function buildPlaceLabel(place) {
+  const a = place.address || {};
+  const name = a.amenity || a.university || a.college || a.school || a.hospital ||
+               a.tourism || a.historic || a.building ||
+               a.city || a.town || a.village || a.hamlet ||
+               a.suburb || a.county || a.state_district ||
+               place.display_name.split(',')[0];
+  const parts = [a.city || a.town || a.village, a.state, a.country].filter(Boolean);
+  return { name, sub: parts.slice(0, 3).join(', ') };
 }
 
 function debounceMapAutocomplete(val) {
